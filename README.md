@@ -1,139 +1,124 @@
-# Probabilistic U-Net (PyTorch + Typer CLI)
+# Probabilistic U-Net
 
-This repository contains a packaged Probabilistic U-Net implementation for ambiguous image segmentation, updated to work cleanly with modern PyTorch and a Typer-based command-line interface.
+A PyTorch implementation of the Probabilistic U-Net for ambiguous image segmentation.
 
-- Paper: https://arxiv.org/abs/1806.05034
-- Original TensorFlow/PyTorch lineage: https://github.com/SimonKohl/probabilistic_unet and https://github.com/stefanknegt/Probabilistic-Unet-Pytorch
+**Paper:** Kohl et al., *A Probabilistic U-Net for Segmentation of Ambiguous Images* (NeurIPS 2018) — https://arxiv.org/abs/1806.05034
 
-## What changed
+---
 
-- packaged the code as an installable `probabilistic_unet` Python module
-- added a Typer CLI for training and visualization workflows
-- replaced hard-coded `.cuda()` calls with modern device selection (`cuda`, `mps`, or `cpu`)
-- updated checkpoint loading and loss usage for current PyTorch APIs
-- kept `train_model.py` and `visualize.py` as thin compatibility entrypoints
+## What it does
 
-## Repository layout
+Standard segmentation models produce a single deterministic mask for each input. When the correct segmentation is genuinely ambiguous — because of annotation disagreement, partial occlusion, or inherent semantic ambiguity — a single prediction is not enough.
 
-```text
-probabilistic_unet/
-  __init__.py
-  __main__.py
-  blocks.py
-  cli.py
-  data.py
-  model.py
-  training.py
-  unet.py
-  utils.py
-  visualization.py
-train_model.py
-visualize.py
-pyproject.toml
-environment.yml
+The Probabilistic U-Net combines a U-Net with a conditional variational autoencoder (CVAE) latent space. At training time the model learns a posterior distribution `q(z | x, y)` that encodes *what makes a particular segmentation plausible* given the image. At test time it samples `z ~ p(z | x)` from the prior and decodes each sample through the U-Net features into a distinct, valid segmentation hypothesis.
+
+---
+
+## Architecture
+
+```
+                   ┌──────────────┐
+                   │   image  x   │
+                   └──────┬───────┘
+           ┌──────────────┼──────────────┐
+           ▼              ▼              ▼
+      ┌─────────┐   ┌──────────┐  ┌──────────┐
+      │  U-Net  │   │  Prior   │  │Posterior │  (posterior only during training)
+      │features │   │ p(z | x) │  │q(z|x, y) │
+      └────┬────┘   └────┬─────┘  └────┬─────┘
+           │             │ sample z     │
+           └──────┬──────┘             │
+                  ▼                    │
+            ┌──────────┐               │ KL divergence
+            │  Fcomb   │◄──────────────┘
+            │ (1×1 CNN)│
+            └────┬─────┘
+                 ▼
+           segmentation ŷ
 ```
 
-## Environment setup
+The **prior** and **posterior** are lightweight convolutional encoders that each output the mean and log-variance of a diagonal Gaussian.  The **Fcomb** head tiles the sampled latent vector `z` across the spatial dimensions of the U-Net feature map and combines them with a small 1×1 convolutional network.
 
-The project now installs like a normal Python package.
+---
 
-### Option 1: `venv` + pip
+## Loss function
+
+Training maximises the ELBO per image:
+
+```
+ELBO(x, y) = E_{z ~ q(z|x,y)} [ log p(y | x, z) ]  −  β · KL[ q(z|x,y) || p(z|x) ]
+```
+
+- The **reconstruction term** is a summed binary cross-entropy between the predicted logits and the ground-truth mask.
+- The **KL term** is computed analytically between two diagonal Gaussians.
+- `β` (default 10) weights the KL penalty; higher values push the prior and posterior closer together and produce more diverse prior samples at test time.
+
+---
+
+## Installation
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e .
+pip install -e .
 ```
 
-### Option 2: Conda or Mamba
+For a GPU-specific PyTorch build, install that first from https://pytorch.org/get-started/locally/, then run the command above.
+
+---
+
+## Quick start
+
+```python
+from probabilistic_unet.training import TrainingConfig, ModelConfig, train_model
+
+config = TrainingConfig(
+    data_dir="data",          # directory containing preprocessed LIDC .pickle files
+    output_dir="outputs/run-01",
+    epochs=35,
+    batch_size_train=20,
+    model=ModelConfig(latent_dim=6),
+)
+train_model(config)
+```
+
+```python
+from probabilistic_unet.visualization import VisualizationConfig, visualize_predictions
+
+config = VisualizationConfig(
+    data_dir="data",
+    checkpoint_dir="outputs/run-01",
+    output_dir="outputs/run-01",
+    samples_per_example=4,
+)
+visualize_predictions(config)
+```
+
+Each call to `visualize_predictions` draws several independent samples from `p(z | x)` and saves them side-by-side so you can inspect the diversity of the model's hypotheses.
+
+---
+
+## ADE20k example: latent space as semantic class selector
+
+The LIDC benchmark models uncertainty that arises from *annotator disagreement* — different radiologists draw slightly different boundaries around the same nodule.
+
+A structurally identical form of ambiguity arises when a single scene contains many plausible objects to segment.  Given a photograph of a living room, "segment the chair", "segment the table", and "segment the window" are all valid tasks.  If we train the Probabilistic U-Net on (image, single-class binary mask) pairs where the class is chosen randomly at each training step, the model must learn a latent space whose samples correspond to different semantic classes.
+
+`examples/ade20k_multiclass.py` demonstrates this.  It uses a SegFormer model pre-trained on ADE20k (via 🤗 Transformers) to automatically produce per-class binary masks from any collection of RGB images, then trains the Probabilistic U-Net on those pairs.
 
 ```bash
-conda env create -f environment.yml
-conda activate probabilistic-unet
+pip install transformers Pillow
+python examples/ade20k_multiclass.py --image-dir /path/to/images --output-dir outputs/ade20k
 ```
 
-### PyTorch note
+At inference time, sampling different `z` values from the prior for the same image yields masks that highlight different objects in the scene — the latent space has learned to encode *which* object is being asked about rather than where its boundary is.
 
-If you need a platform-specific CUDA or ROCm build of PyTorch, install that build first using the selector on https://pytorch.org/get-started/locally/ and then run:
+---
 
-```bash
-python -m pip install -e .
-```
+## Example results (LIDC)
 
-## Data setup
+The four small panels on the right are independent samples from `p(z | x)` for a single lung CT patch.  Each sample is a plausible nodule segmentation; together they characterise the model's uncertainty.
 
-This code expects the preprocessed LIDC `.pickle` files used by prior versions of the project.
-
-1. Download the preprocessed LIDC data from the link referenced by the upstream repository.
-2. Create a `data/` directory in the repository root.
-3. Place the `.pickle` files inside `data/`.
-
-The loader will read every `*.pickle` file in that directory.
-
-## CLI usage
-
-After installation, use either the module form or the console script:
-
-```bash
-python -m probabilistic_unet --help
-probabilistic-unet --help
-```
-
-### Train
-
-```bash
-probabilistic-unet train \
-  --data-dir data \
-  --output-dir outputs/run-01 \
-  --epochs 35 \
-  --batch-size-train 20 \
-  --device cpu
-```
-
-### Visualize samples
-
-```bash
-probabilistic-unet visualize \
-  --data-dir data \
-  --checkpoint-dir trained_model \
-  --output-dir outputs/run-01 \
-  --samples-per-example 4
-```
-
-## Legacy entrypoints
-
-The original script-style commands still work with default settings:
-
-```bash
-python train_model.py
-python visualize.py
-```
-
-## Outputs
-
-Training writes the following artifacts into the chosen output directory:
-
-- `model_dict.pth`
-- `loss_train.png`
-- `loss_val.png`
-- `logging.txt`
-- `training_config.json`
-
-Visualization writes sampled predictions into:
-
-- `OUTPUT_DIR/visual_results/`
-
-## Notes
-
-- The validation split follows the existing repository behavior: the first portion of the dataset is used for validation and the remainder is used for training.
-- The provided `trained_model/model_dict.pth` checkpoint remains usable through the new visualization command.
-- This repository does not currently ship an automated dataset-backed test suite, so validation is primarily done through import, CLI, and model smoke checks.
-
-## Example results
-
-*Example Result 1*
+*Example 1*
 ![result1](https://github.com/Usman-Rafique/Probabilistic_UNet/blob/master/results/result_0_0.png)
 
-*Example Result 2*
+*Example 2*
 ![result2](https://github.com/Usman-Rafique/Probabilistic_UNet/blob/master/results/result_0_2.png)
