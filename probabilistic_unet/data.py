@@ -50,6 +50,8 @@ class LIDC_IDRI(Dataset):
         for label in self.labels:
             if np.max(label) > 1 or np.min(label) < 0:
                 raise ValueError("Expected labels to be normalized to [0, 1]")
+            if len(label) == 0:
+                raise ValueError("Expected each example to contain at least one segmentation mask")
 
     def __getitem__(self, index: int):
         image = np.expand_dims(self.images[index], axis=0)

@@ -151,6 +151,8 @@ class ProbabilisticUnet(nn.Module):
             if segm is None:
                 raise ValueError("segm must be provided when training=True")
             self.posterior_latent_space = self.posterior(patch, segm)
+        else:
+            self.posterior_latent_space = None
         self.prior_latent_space = self.prior(patch)
         self.unet_features = self.unet(patch, False)
 

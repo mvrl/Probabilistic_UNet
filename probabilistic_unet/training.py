@@ -59,6 +59,7 @@ def _to_jsonable(config: TrainingConfig) -> dict[str, Any]:
     payload = asdict(config)
     payload["data_dir"] = str(config.data_dir)
     payload["output_dir"] = str(config.output_dir)
+    payload["split_strategy"] = "The first portion of the dataset is reserved for validation; the remainder is used for training."
     return payload
 
 

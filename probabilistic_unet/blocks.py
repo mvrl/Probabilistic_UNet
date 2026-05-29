@@ -50,7 +50,9 @@ class UpConvBlock(nn.Module):
             up = self.upconv_layer(x)
 
         if up.shape[2:] != bridge.shape[2:]:
-            raise ValueError(f"Upsampled tensor shape {up.shape} incompatible with skip connection shape {bridge.shape}")
+            raise ValueError(
+                f"Upsampled spatial dimensions {up.shape[2:]} do not match skip connection spatial dimensions {bridge.shape[2:]}"
+            )
 
         out = torch.cat([up, bridge], dim=1)
         return self.conv_block(out)
