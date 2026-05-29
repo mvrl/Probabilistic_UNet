@@ -49,6 +49,7 @@ class UpConvBlock(nn.Module):
         else:
             up = self.upconv_layer(x)
 
+        # Tensors use NCHW layout, so both height and width must match.
         if up.shape[2:] != bridge.shape[2:]:
             raise ValueError(
                 f"Upsampled spatial dimensions {up.shape[2:]} do not match skip connection spatial dimensions {bridge.shape[2:]}"

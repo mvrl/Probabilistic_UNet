@@ -165,6 +165,7 @@ class ProbabilisticUnet(nn.Module):
         return self.fcomb(self.unet_features, z_prior)
 
     def reconstruct(self, use_posterior_mean: bool = False, calculate_posterior: bool = False, z_posterior: torch.Tensor | None = None) -> torch.Tensor:
+        """Decode a posterior sample, sampling one automatically when none is supplied."""
         if use_posterior_mean:
             z_posterior = self.posterior_latent_space.base_dist.loc
         elif calculate_posterior or z_posterior is None:

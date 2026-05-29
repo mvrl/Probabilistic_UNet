@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import pickle
-import random
 from pathlib import Path
 
 import numpy as np
@@ -56,7 +55,8 @@ class LIDC_IDRI(Dataset):
     def __getitem__(self, index: int):
         image = np.expand_dims(self.images[index], axis=0)
         # __init__ guarantees at least one mask per example.
-        label = self.labels[index][random.randint(0, len(self.labels[index]) - 1)].astype(np.float32)
+        label_index = torch.randint(len(self.labels[index]), size=(1,)).item()
+        label = self.labels[index][label_index].astype(np.float32)
 
         if self.transform is not None:
             image = self.transform(image)
