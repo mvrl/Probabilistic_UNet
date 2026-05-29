@@ -1,17 +1,17 @@
+from __future__ import annotations
+
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
-import numpy as np
-from utils import init_weights
+
+from .utils import init_weights
+
 
 class DownConvBlock(nn.Module):
-    """
-    A block of three convolutional layers where each layer is followed by a non-linear activation function
-    Between each block we add a pooling operation.
-    """
-    def __init__(self, input_dim, output_dim, initializers, padding, pool=True):
-        super(DownConvBlock, self).__init__()
-        layers = []
+    """Three convolutional layers with ReLU activations and optional pooling."""
+
+    def __init__(self, input_dim: int, output_dim: int, initializers: dict[str, str], padding: bool, pool: bool = True):
+        super().__init__()
+        layers: list[nn.Module] = []
 
         if pool:
             layers.append(nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True))
@@ -24,20 +24,17 @@ class DownConvBlock(nn.Module):
         layers.append(nn.ReLU(inplace=True))
 
         self.layers = nn.Sequential(*layers)
-
         self.layers.apply(init_weights)
 
-    def forward(self, patch):
+    def forward(self, patch: torch.Tensor) -> torch.Tensor:
         return self.layers(patch)
 
 
 class UpConvBlock(nn.Module):
-    """
-    A block consists of an upsampling layer followed by a convolutional layer to reduce the amount of channels and then a DownConvBlock
-    If bilinear is set to false, we do a transposed convolution instead of upsampling
-    """
-    def __init__(self, input_dim, output_dim, initializers, padding, bilinear=True):
-        super(UpConvBlock, self).__init__()
+    """Upsampling block used by the U-Net decoder."""
+
+    def __init__(self, input_dim: int, output_dim: int, initializers: dict[str, str], padding: bool, bilinear: bool = True):
+        super().__init__()
         self.bilinear = bilinear
 
         if not self.bilinear:
@@ -46,14 +43,17 @@ class UpConvBlock(nn.Module):
 
         self.conv_block = DownConvBlock(input_dim, output_dim, initializers, padding, pool=False)
 
-    def forward(self, x, bridge):
+    def forward(self, x: torch.Tensor, bridge: torch.Tensor) -> torch.Tensor:
         if self.bilinear:
-            up = nn.functional.interpolate(x, mode='bilinear', scale_factor=2, align_corners=True)
+            up = nn.functional.interpolate(x, mode="bilinear", scale_factor=2, align_corners=True)
         else:
             up = self.upconv_layer(x)
-        
-        assert up.shape[3] == bridge.shape[3]
-        out = torch.cat([up, bridge], 1)
-        out =  self.conv_block(out)
 
-        return out
+        # Tensors use NCHW layout, so both height and width must match.
+        if up.shape[2:] != bridge.shape[2:]:
+            raise ValueError(
+                f"Upsampled spatial dimensions {up.shape[2:]} do not match skip connection spatial dimensions {bridge.shape[2:]}"
+            )
+
+        out = torch.cat([up, bridge], dim=1)
+        return self.conv_block(out)
