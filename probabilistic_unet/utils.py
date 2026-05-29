@@ -30,13 +30,14 @@ def init_weights_orthogonal_normal(module: nn.Module) -> None:
 
 def l2_regularisation(module: nn.Module) -> torch.Tensor:
     l2_reg = None
+    first_parameter = next(module.parameters(), None)
     for parameter in module.parameters():
         if l2_reg is None:
             l2_reg = parameter.norm(2)
         else:
             l2_reg = l2_reg + parameter.norm(2)
     if l2_reg is None:
-        return torch.tensor(0.0)
+        return torch.tensor(0.0, device=first_parameter.device if first_parameter is not None else None)
     return l2_reg
 
 

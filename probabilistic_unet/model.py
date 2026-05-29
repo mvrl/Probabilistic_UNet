@@ -65,7 +65,7 @@ class AxisAlignedConvGaussian(nn.Module):
         encoding = torch.mean(encoding, dim=2, keepdim=True)
         encoding = torch.mean(encoding, dim=3, keepdim=True)
 
-        mu_log_sigma = self.conv_layer(encoding).squeeze(dim=2).squeeze(dim=2)
+        mu_log_sigma = self.conv_layer(encoding).squeeze(dim=(2, 3))
         mu = mu_log_sigma[:, : self.latent_dim]
         log_sigma = mu_log_sigma[:, self.latent_dim :]
         return Independent(Normal(loc=mu, scale=torch.exp(log_sigma)), 1)

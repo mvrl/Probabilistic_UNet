@@ -53,7 +53,7 @@ class LIDC_IDRI(Dataset):
 
     def __getitem__(self, index: int):
         image = np.expand_dims(self.images[index], axis=0)
-        label = self.labels[index][random.randint(0, 3)].astype(np.float32)
+        label = self.labels[index][random.randint(0, len(self.labels[index]) - 1)].astype(np.float32)
 
         if self.transform is not None:
             image = self.transform(image)
