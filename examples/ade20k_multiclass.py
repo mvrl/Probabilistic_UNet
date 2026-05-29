@@ -257,7 +257,7 @@ def _plot_losses(train: list[float], val: list[float], out: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Visualisation
+# Visualization
 # ---------------------------------------------------------------------------
 
 def visualize(
@@ -352,8 +352,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--latent-dim", default=6, type=int)
     p.add_argument("--beta", default=10.0, type=float, help="KL weight in the ELBO")
     p.add_argument("--lr", default=1e-4, type=float)
-    p.add_argument("--n-vis-images", default=4, type=int, help="How many images to visualise")
-    p.add_argument("--n-samples", default=6, type=int, help="Prior samples per visualised image")
+    p.add_argument("--n-vis-images", default=4, type=int, help="How many images to visualize")
+    p.add_argument("--n-samples", default=6, type=int, help="Prior samples per visualized image")
     p.add_argument(
         "--segformer-model",
         default="nvidia/segformer-b0-finetuned-ade-512-512",
