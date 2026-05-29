@@ -74,6 +74,7 @@ def create_data_loaders(config: TrainingConfig, device: torch.device) -> tuple[D
     if split >= dataset_size:
         split = dataset_size - 1
 
+    # Preserve the repository's original deterministic split order.
     print("There is no random shuffle: initial portion of the dataset is used for validation and the rest for training")
     train_indices, val_indices = indices[split:], indices[:split]
 

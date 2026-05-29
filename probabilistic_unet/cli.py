@@ -22,7 +22,7 @@ def parse_num_filters(value: str) -> tuple[int, ...]:
 
 @app.command()
 def train(
-    data_dir: Path = typer.Option(Path("data"), exists=False, file_okay=False, dir_okay=True, help="Directory containing preprocessed .pickle LIDC files."),
+    data_dir: Path = typer.Option(Path("data"), exists=True, file_okay=False, dir_okay=True, help="Directory containing preprocessed .pickle LIDC files."),
     output_dir: Path = typer.Option(Path("outputs/1"), file_okay=False, dir_okay=True, help="Directory for checkpoints and training artifacts."),
     epochs: int = typer.Option(35, min=1, help="Number of training epochs."),
     batch_size_train: int = typer.Option(20, min=1, help="Training batch size."),
@@ -69,8 +69,8 @@ def train(
 
 @app.command()
 def visualize(
-    data_dir: Path = typer.Option(Path("data"), exists=False, file_okay=False, dir_okay=True, help="Directory containing preprocessed .pickle LIDC files."),
-    checkpoint_dir: Path = typer.Option(Path("trained_model"), exists=False, file_okay=False, dir_okay=True, help="Directory containing model_dict.pth."),
+    data_dir: Path = typer.Option(Path("data"), exists=True, file_okay=False, dir_okay=True, help="Directory containing preprocessed .pickle LIDC files."),
+    checkpoint_dir: Path = typer.Option(Path("trained_model"), exists=True, file_okay=False, dir_okay=True, help="Directory containing model_dict.pth."),
     output_dir: Path = typer.Option(Path("outputs/1"), file_okay=False, dir_okay=True, help="Directory where visualizations are written."),
     batch_size_val: int = typer.Option(10, min=1, help="Visualization batch size."),
     save_batches: int = typer.Option(3, min=1, help="Number of validation batches to render."),
